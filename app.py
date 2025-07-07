@@ -1,11 +1,9 @@
 from flask import Flask, request, jsonify
 import requests
 from simple_salesforce import Salesforce
-import json
 
 app = Flask(__name__)
 
-# Salesforce credentials (store securely in production)
 SF_USERNAME = 'balaji.j@terralogic.com'
 SF_PASSWORD = 'Balu@3303'
 SF_SECURITY_TOKEN = 'lvq4mJ6Oi6a7aPv6arl8P70y3'
@@ -45,14 +43,14 @@ def handle_invoice():
         version_id = version['Id']
         filename = version['Title'] + '.' + version['FileExtension']
 
-        # Step 3: Download binary file
+        # Step 3: Download file content
         file_url = f"{sf.base_url}sobjects/ContentVersion/{version_id}/VersionData"
         file_res = requests.get(file_url, headers={"Authorization": "Bearer " + sf.session_id})
 
         if file_res.status_code != 200:
             return jsonify({'error': 'Failed to download file'}), 500
 
-        # Step 4: Send to OCR
+        # Step 4: Send file to OCR API
         files = {
             'file': (filename, file_res.content, 'application/octet-stream')
         }
@@ -65,15 +63,26 @@ def handle_invoice():
                 'response': ocr_res.text
             }), 502
 
+        # Step 5: Parse OCR result
         ocr_data = ocr_res.json()
-        parsed_data = ocr_data.get('ocrResult', {}).get('parsedData', {})
+        parsed = ocr_data.get('ocrResult', {}).get('parsedData', {})
 
-        # Step 5: Store parsedData into Invoice__c (in Invoice__c text field)
-        parsed_text = json.dumps(parsed_data, indent=2)
+        merchant_name = parsed.get('merchant_name')
+        total_amount_str = parsed.get('total_amount')
+        currency = parsed.get('currency')
 
+        # Convert total_amount to Decimal/Number (remove commas, symbols)
+        try:
+            total_amount = float(total_amount_str.replace(',', '').replace('₹', '').strip()) if total_amount_str else None
+        except:
+            total_amount = None
+
+        # Step 6: Create Invoice__c
         invoice_data = {
-            'Case__c': case_id,
-            'Invoice__c': parsed_text  # 📝 Store parsedData as string
+            'Merchant_Name__c': merchant_name,
+            'Total_Amount__c': total_amount,
+            'Currency__c': currency,
+            'Case__c': case_id
         }
 
         inserted = sf.Invoice__c.create(invoice_data)
@@ -81,7 +90,9 @@ def handle_invoice():
         return jsonify({
             'status': 'success',
             'invoiceId': inserted.get('id'),
-            'parsedData': parsed_data
+            'merchant_name': merchant_name,
+            'total_amount': total_amount,
+            'currency': currency
         }), 200
 
     except Exception as e:
