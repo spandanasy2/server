@@ -65,12 +65,12 @@ def handle_invoice():
             }), 502
 
         # Step 5: Parse OCR result
-        ocr_data = ocr_res.json()
-        parsed = ocr_data.get('ocrResult', {}).get('parsedData', {})
+ocr_data = ocr_res.json()
+parsed = ocr_data.get('parsedData', {})
 
-        merchant_name = parsed.get('merchant_name')
-        total_amount_str = parsed.get('total_amount')
-        currency = parsed.get('currency')
+merchant_name = parsed.get('merchant_name')
+total_amount_str = parsed.get('total_amount')
+currency = parsed.get('currency')
 
         # Step 6: Safely convert total_amount to float
         try:
