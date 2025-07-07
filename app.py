@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify
 import requests
 from simple_salesforce import Salesforce
+import json
 
 app = Flask(__name__)
 
-# Replace with your Salesforce credentials
+# Salesforce credentials (store securely in production)
 SF_USERNAME = 'balaji.j@terralogic.com'
 SF_PASSWORD = 'Balu@3303'
 SF_SECURITY_TOKEN = 'lvq4mJ6Oi6a7aPv6arl8P70y3'
@@ -51,11 +52,10 @@ def handle_invoice():
         if file_res.status_code != 200:
             return jsonify({'error': 'Failed to download file'}), 500
 
-        # Step 4: Send file to OCR API
+        # Step 4: Send to OCR
         files = {
             'file': (filename, file_res.content, 'application/octet-stream')
         }
-
         ocr_res = requests.post(OCR_API_URL, files=files)
 
         if ocr_res.status_code != 200:
@@ -65,10 +65,23 @@ def handle_invoice():
                 'response': ocr_res.text
             }), 502
 
-        # Return OCR result (you can also store back to Salesforce)
+        ocr_data = ocr_res.json()
+        parsed_data = ocr_data.get('ocrResult', {}).get('parsedData', {})
+
+        # Step 5: Store parsedData into Invoice__c (in Invoice__c text field)
+        parsed_text = json.dumps(parsed_data, indent=2)
+
+        invoice_data = {
+            'Case__c': case_id,
+            'Invoice__c': parsed_text  # 📝 Store parsedData as string
+        }
+
+        inserted = sf.Invoice__c.create(invoice_data)
+
         return jsonify({
             'status': 'success',
-            'ocrResult': ocr_res.json()
+            'invoiceId': inserted.get('id'),
+            'parsedData': parsed_data
         }), 200
 
     except Exception as e:
