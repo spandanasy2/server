@@ -4,6 +4,7 @@ from simple_salesforce import Salesforce
 
 app = Flask(__name__)
 
+# ⚠️ In production, store these securely (e.g. environment variables)
 SF_USERNAME = 'balaji.j@terralogic.com'
 SF_PASSWORD = 'Balu@3303'
 SF_SECURITY_TOKEN = 'lvq4mJ6Oi6a7aPv6arl8P70y3'
@@ -71,13 +72,13 @@ def handle_invoice():
         total_amount_str = parsed.get('total_amount')
         currency = parsed.get('currency')
 
-        # Convert total_amount to Decimal/Number (remove commas, symbols)
+        # Step 6: Safely convert total_amount to float
         try:
             total_amount = float(total_amount_str.replace(',', '').replace('₹', '').strip()) if total_amount_str else None
         except:
             total_amount = None
 
-        # Step 6: Create Invoice__c
+        # Step 7: Prepare Invoice__c data
         invoice_data = {
             'Merchant_Name__c': merchant_name,
             'Total_Amount__c': total_amount,
@@ -85,8 +86,13 @@ def handle_invoice():
             'Case__c': case_id
         }
 
+        # Optional: Log parsed data for debugging
+        print("🚀 Parsed Invoice Data:", invoice_data)
+
+        # Step 8: Create Invoice__c record
         inserted = sf.Invoice__c.create(invoice_data)
 
+        # Step 9: Return confirmation
         return jsonify({
             'status': 'success',
             'invoiceId': inserted.get('id'),
