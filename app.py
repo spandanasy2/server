@@ -66,7 +66,12 @@ def handle_invoice():
 
         # Step 5: Parse OCR result
 ocr_data = ocr_res.json()
-parsed = ocr_data.get('parsedData', {})
+
+# Support both response structures
+if 'ocrResult' in ocr_data:
+    parsed = ocr_data.get('ocrResult', {}).get('parsedData', {})
+else:
+    parsed = ocr_data.get('parsedData', {})
 
 merchant_name = parsed.get('merchant_name')
 total_amount_str = parsed.get('total_amount')
